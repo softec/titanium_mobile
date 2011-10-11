@@ -20,6 +20,7 @@ public class MapModule extends KrollModule
 	@Kroll.constant public static final int ANNOTATION_RED = 1;
 	@Kroll.constant public static final int ANNOTATION_GREEN = 2;
 	@Kroll.constant public static final int ANNOTATION_PURPLE = 3;
+    @Kroll.constant public static final int ANNOTATION_BLUE = 4;
 
 	@Kroll.constant public static final int STANDARD_TYPE = TiMapView.MAP_VIEW_STANDARD;
 	@Kroll.constant public static final int SATELLITE_TYPE = TiMapView.MAP_VIEW_SATELLITE;

@@ -92,7 +92,7 @@ public class TiMapView extends TiUIView
 	private TitaniumOverlay overlay;
 	private MyLocationOverlay myLocation;
 	private TiOverlayItemView itemView;
-	private ArrayList<AnnotationProxy> annotations;
+	private ArrayList<TiAnnotation> annotations;
 	private ArrayList<SelectedAnnotation> selectedAnnotations;
 	private Handler handler;
 
@@ -153,7 +153,7 @@ public class TiMapView extends TiUIView
 
 	class TitaniumOverlay extends ItemizedOverlay<TiOverlayItem>
 	{
-		ArrayList<AnnotationProxy> annotations;
+		ArrayList<TiAnnotation> annotations;
 		TitaniumOverlayListener listener;
 
 		public TitaniumOverlay(Drawable defaultDrawable, TitaniumOverlayListener listener) {
@@ -161,93 +161,51 @@ public class TiMapView extends TiUIView
 			this.listener = listener;
 		}
 
-		public void setAnnotations(ArrayList<AnnotationProxy> annotations) {
-			this.annotations = new ArrayList<AnnotationProxy>(annotations);
+		public void setAnnotations(ArrayList<TiAnnotation> annotations) {
+			this.annotations = new ArrayList<TiAnnotation>(annotations);
 			populate();
 		}
 
-		@Override
-		protected TiOverlayItem createItem(int i) {
-			TiOverlayItem item = null;
+        @Override
+        protected TiOverlayItem createItem(int i) {
+            TiOverlayItem item = null;
 
-			AnnotationProxy p = annotations.get(i);
-			KrollDict a = p.getProperties();
-			if (a.containsKey(TiC.PROPERTY_LATITUDE) && a.containsKey(TiC.PROPERTY_LONGITUDE)) {
-				String title = a.optString(TiC.PROPERTY_TITLE, "");
-				String subtitle = a.optString(TiC.PROPERTY_SUBTITLE, "");
+            TiAnnotation a = annotations.get(i);
+            if (a.getLatitude() != null && a.getLongitude() != null) {
+                String title = a.getTitle() != null ? a.getTitle() : "";
+                String subtitle = a.getSubtitle() != null ? a.getTitle() : "";
+                GeoPoint location = new GeoPoint(scaleToGoogle(a.getLatitude()), scaleToGoogle(a.getLongitude()));
 
-				GeoPoint location = new GeoPoint(scaleToGoogle(a.getDouble(TiC.PROPERTY_LATITUDE)), scaleToGoogle(a.getDouble(TiC.PROPERTY_LONGITUDE)));
-				item = new TiOverlayItem(location, title, subtitle, p);
+                item = new TiOverlayItem(location, title, subtitle, a);
+                Drawable marker = null;
+                if (a.getImage() != null) {
+                    marker = makeMarker(a.getImage());
+                    item.setMarker(marker);
+                }
+                if (marker == null && a.getPinColor() != null) {
+                    marker = makeMarker(a.getPinColor().intValue());
+                    item.setMarker(marker);
+                } else {
+                    Log.d(LCAT, "No image or color specified for marker, using blue color");
+                }
 
-				//prefer pinImage to pincolor.
-				if (a.containsKey(TiC.PROPERTY_IMAGE) || a.containsKey(TiC.PROPERTY_PIN_IMAGE))
-				{
-					String imagePath = a.getString(TiC.PROPERTY_IMAGE);
-					if (imagePath == null) {
-						imagePath = a.getString(TiC.PROPERTY_PIN_IMAGE);
-					}
-					Drawable marker = makeMarker(imagePath);
-					boundCenterBottom(marker);
-					item.setMarker(marker);
-				} else if (a.containsKey(TiC.PROPERTY_PINCOLOR)) {
-					Object value = a.get(TiC.PROPERTY_PINCOLOR);
-					
-					try {
-						if (value instanceof String) {
-							
-							// Supported strings: Supported formats are: 
-							//     #RRGGBB #AARRGGBB 'red', 'blue', 'green', 'black', 'white', 'gray', 'cyan', 'magenta', 'yellow', 'lightgray', 'darkgray'
-							int markerColor = TiConvert.toColor((String) value);
-							item.setMarker(makeMarker(markerColor));
-						} else {
-							// Assume it's a numeric
-							switch(a.getInt(TiC.PROPERTY_PINCOLOR)) {
-								case 1 : // RED
-									item.setMarker(makeMarker(Color.RED));
-									break;
-								case 2 : // GREEN
-									item.setMarker(makeMarker(Color.GREEN));
-									break;
-								case 3 : // PURPLE
-									item.setMarker(makeMarker(Color.argb(255,192,0,192)));
-									break;
-							}
-						}
-					} catch (Exception e) {
-						// May as well catch all errors 
-						Log.w(LCAT, "Unable to parse color [" + a.getString(TiC.PROPERTY_PINCOLOR)+"] for item ["+i+"]");
-					}
-				}
-
-				if (a.containsKey(TiC.PROPERTY_LEFT_BUTTON)) {
-					item.setLeftButton(proxy.getTiContext().resolveUrl(null, TiConvert.toString(a, TiC.PROPERTY_LEFT_BUTTON)));
-				}
-				if (a.containsKey(TiC.PROPERTY_RIGHT_BUTTON)) {
-					item.setRightButton(proxy.getTiContext().resolveUrl(null, TiConvert.toString(a, TiC.PROPERTY_RIGHT_BUTTON)));
-				}
-				if (a.containsKey(TiC.PROPERTY_LEFT_VIEW)) {
-					Object leftView = a.get(TiC.PROPERTY_LEFT_VIEW);
-					if (leftView instanceof TiViewProxy) {
-						item.setLeftView((TiViewProxy)leftView);
-
-					} else {
-						Log.e(LCAT, "invalid type for leftView");
-					}
-				}
-				if (a.containsKey(TiC.PROPERTY_RIGHT_VIEW)) {
-					Object rightView = a.get(TiC.PROPERTY_RIGHT_VIEW);
-					if (rightView instanceof TiViewProxy) {
-						item.setRightView((TiViewProxy)rightView);
-
-					} else {
-						Log.e(LCAT, "invalid type for rightView");
-					}
-				}
-			} else {
-				Log.w(LCAT, "Skipping annotation: No coordinates #" + i);
-			}
-			return item;
-		}
+                if (a.getLeftButton() != null) {
+                    item.setLeftButton(proxy.getTiContext().resolveUrl(null, a.getLeftButton()));
+                }
+                if (a.getRightButton() != null) {
+                    item.setRightButton(proxy.getTiContext().resolveUrl(null, a.getRightButton()));
+                }
+                if (a.getLeftView() != null) {
+                    item.setLeftView(a.getLeftView());
+                }
+                if (a.getRightView() != null) {
+                    item.setRightView(a.getRightView());
+                }
+            } else {
+                Log.w(LCAT, "Skipping annotation: No coordinates #" + i);
+            }
+            return item;
+        }
 
 		@Override
 		public int size() {
@@ -280,7 +238,7 @@ public class TiMapView extends TiUIView
         }
 	}
 	
-	public TiMapView(TiViewProxy proxy, Window mapWindow, ArrayList<AnnotationProxy> annotations, ArrayList<SelectedAnnotation>selectedAnnotations)
+	public TiMapView(TiViewProxy proxy, Window mapWindow, ArrayList<TiAnnotation> annotations, ArrayList<SelectedAnnotation>selectedAnnotations)
 	{
 		super(proxy);
 
@@ -522,7 +480,7 @@ public class TiMapView extends TiUIView
 			Object [] annotations = (Object[]) d.get(TiC.PROPERTY_ANNOTATIONS);
 			for(int i = 0; i < annotations.length; i++) {
 				AnnotationProxy ap = (AnnotationProxy) annotations[i];
-				this.annotations.add(ap);
+				this.annotations.add(TiAnnotation.fromAnnotationProxy(ap));
 			}
 			doSetAnnotations(this.annotations);
 		}
@@ -594,7 +552,7 @@ public class TiMapView extends TiUIView
 		}
 	}
 
-	public void doSetAnnotations(ArrayList<AnnotationProxy> annotations)
+	public void doSetAnnotations(ArrayList<TiAnnotation> annotations)
 	{
 		if (annotations != null) {
 
@@ -682,6 +640,8 @@ public class TiMapView extends TiUIView
                         }
                     }
                 }
+            } else {
+                Log.d(LCAT, "Unable to find the annotation to select/deselect");
             }
         }
 	}

@@ -8,6 +8,7 @@ package ti.modules.titanium.map;
 
 import java.util.ArrayList;
 
+import org.appcelerator.kroll.KrollDefaultValueProvider;
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.TiApplication;
@@ -50,7 +51,7 @@ public class ViewProxy extends TiViewProxy
 	private boolean destroyed = false;
 
 	private TiMapView mapView;
-	private ArrayList<AnnotationProxy> annotations;
+	private ArrayList<TiAnnotation> annotations;
 	private ArrayList<TiMapView.SelectedAnnotation> selectedAnnotations;
 	
 	public ViewProxy(TiContext tiContext) {
@@ -59,7 +60,7 @@ public class ViewProxy extends TiViewProxy
 		eventManager.addOnEventChangeListener(this);
 		tiContext.addOnLifecycleEventListener(this);
 
-		annotations = new ArrayList<AnnotationProxy>();
+		annotations = new ArrayList<TiAnnotation>();
 		selectedAnnotations = new ArrayList<TiMapView.SelectedAnnotation>();
 	}
 
@@ -87,15 +88,10 @@ public class ViewProxy extends TiViewProxy
 			// based on its context;
 			rootLifecycleListener = new OnLifecycleEvent()
 			{
-				@Override
 				public void onStop(Activity activity){}
-				@Override
 				public void onStart(Activity activity){}
-				@Override
 				public void onResume(Activity activity){}
-				@Override
 				public void onPause(Activity activity){}
-				@Override
 				public void onDestroy(Activity activity)
 				{
 					if (activity != null && activity.equals(rootActivity)) {
@@ -153,40 +149,55 @@ public class ViewProxy extends TiViewProxy
 	}
 
 	@Kroll.method
-	public void addAnnotation(AnnotationProxy annotation)
-	{
-        addAnnotation(annotation, true);
+	public String addAnnotation(Object arg, @Kroll.argument(optional = true) Boolean updateDisplay) {
+		TiAnnotation annotation = null;
+		if (arg instanceof AnnotationProxy) {
+			annotation = TiAnnotation.fromAnnotationProxy((AnnotationProxy) arg);
+		} else if (arg instanceof KrollDict) {
+			annotation = TiAnnotation.fromDict((KrollDict) arg);
+		} else {
+			Log.d(LCAT, "Unexpected annotation type: " + arg.getClass().getName());
+		}
+		if (annotation != null) {
+			annotations.add(annotation);
+
+			if ((updateDisplay == null || updateDisplay.equals(Boolean.TRUE)) && mapView != null) {
+				mapView.updateAnnotations();
+			}
+			return annotation.getId();
+		} else {
+			return null;
+		}
 	}
 
-    @Kroll.method
-    public void addAnnotation(AnnotationProxy annotation, boolean updateDisplay) {
-        if (annotation != null) {
-            annotations.add(annotation);
-            if(mapView != null && updateDisplay) {
-                mapView.updateAnnotations();
-            }
-        }
-    }
-
-    @Kroll.method
-    public void addAnnotations(Object[] args) {
-        addAnnotations(args, true);
-    }
-
-    @Kroll.method
-    public void addAnnotations(Object[] args, boolean updateDisplay) {
-        if (args != null && args.length > 0) {
-            for (int i = 0, len=args.length; i < len; i++) {
-                if (args[i] instanceof AnnotationProxy) {
-                    annotations.add((AnnotationProxy)args[i]);
-                }
-            }
-        }
-
-        if (mapView != null && updateDisplay) {
-            mapView.updateAnnotations();
-        }
-    }
+	@Kroll.method
+	public ArrayList<String> addAnnotations(Object[] args, @Kroll.argument(optional=true) Boolean updateDisplay)
+	{
+		ArrayList<TiAnnotation> newAnnotations = new ArrayList<TiAnnotation>();
+		ArrayList<String> result = new ArrayList<String>();
+		if (args != null && args.length > 0) {
+			for (int i = 0; i<args.length; i++) {
+				TiAnnotation annotation = null;
+				if (args[i] instanceof AnnotationProxy) {
+					annotation = TiAnnotation.fromAnnotationProxy((AnnotationProxy) args[i]);
+				} else if (args[i] instanceof KrollDict) {
+					KrollDict params = (KrollDict) args[i];
+					annotation = TiAnnotation.fromDict(params);
+				} else {
+					Log.d(LCAT, "Unexpected parameter for addAnnotations " + args[i].getClass().getName());
+				}
+				if (annotation != null) {
+					newAnnotations.add(annotation);
+					result.add(annotation.getId());
+				}
+			}
+		}
+		annotations.addAll(newAnnotations);
+		if (mapView != null && (updateDisplay == null || updateDisplay.equals(Boolean.TRUE))) {
+			mapView.updateAnnotations();
+		}
+		return result;
+	}
 
     @Kroll.method
     public void updateAnnotations() {
@@ -201,11 +212,10 @@ public class ViewProxy extends TiViewProxy
 		// Check for existence
 		int len = annotations.size();
 		for(int i = 0; i < len; i++) {
-			AnnotationProxy a = annotations.get(i);
-			String t = (String) a.getProperty(TiC.PROPERTY_TITLE);
+			TiAnnotation a = annotations.get(i);
 
-			if (t != null) {
-				if (title.equals(t)) {
+			if (a.getTitle() != null) {
+				if (title.equals(a.getTitle())) {
 					existsIndex = i;
 					break;
 				}
@@ -216,81 +226,66 @@ public class ViewProxy extends TiViewProxy
 	}
 
     protected int findAnnotationById(String id) {
-        int existsIndex = -1;
-        // Check for existence
-        int len = annotations.size();
-        for(int i = 0; i < len; i++) {
-            AnnotationProxy a = annotations.get(i);
-            String t = (String) a.getProperty(TiC.PROPERTY_ID);
-
-            if (t != null) {
-                if (id.equals(t)) {
-                    existsIndex = i;
-                    break;
-                }
-            }
-        }
-
-        return existsIndex;
-    }
-
-    @Kroll.method
-    public void removeAnnotations(Object[] removedAnnotations) {
-        removeAnnotations(removedAnnotations, true);
-    }
-
-    @Kroll.method
-    public void removeAnnotations(Object[] removedAnnotations, boolean updateDisplay) {
-        if (removedAnnotations != null && removedAnnotations.length > 0) {
-            for (int i=0, len=removedAnnotations.length; i<len; i++) {
-                removeAnnotation(removedAnnotations[i], false);
-            }
-            if (mapView != null && updateDisplay) {
-                mapView.updateAnnotations();
-            }
-        }
+        return annotations.indexOf(new TiAnnotation(id));
     }
 
 	@Kroll.method
-	public void removeAnnotation(Object arg, boolean updateDisplay)
+	public void removeAnnotations(Object[] removedAnnotations, @Kroll.argument(optional=true) Boolean updateDisplay) {
+		if (removedAnnotations != null && removedAnnotations.length > 0) {
+			for (int i=0; i<removedAnnotations.length; i++) {
+                removeAnnotation(removedAnnotations[i], false);
+			}
+		}
+
+		if (mapView != null && (updateDisplay == null || updateDisplay.equals(Boolean.TRUE))) {
+			mapView.updateAnnotations();
+		}
+	}
+
+    @Kroll.method
+	public void removeAnnotation(Object arg, @Kroll.argument(optional = true) Boolean updateDisplay)
 	{
 		String title = null;
-        String id = null;
+		String id = null;
 
 		if (arg != null) {
 			if (arg instanceof AnnotationProxy) {
-                AnnotationProxy ap = (AnnotationProxy) arg;
-                if (ap.getProperties().containsKey(TiC.PROPERTY_ID)) {
-                    id = ap.getProperties().getString(TiC.PROPERTY_ID);
-                } else {
-                    title = TiConvert.toString(((AnnotationProxy) arg).getProperty("title"));
-                }
-			} else if (arg instanceof KrollDict) {
-                KrollDict dict = (KrollDict) arg;
-                if (dict.containsKeyAndNotNull(TiC.PROPERTY_ID)) {
-                    id = dict.getString(TiC.PROPERTY_ID);
-                } else {
-                    title = dict.getString(TiC.PROPERTY_TITLE);
-                }
-            } else {
-				title = TiConvert.toString(arg);
-			}
-
-            if (id != null) {
-                int existsIndex = findAnnotationById(id);
-                if (existsIndex > -1) {
-                    annotations.remove(existsIndex);
-                }
-            } else if (title != null) {
-				int existsIndex = findAnnotation(title);
-				if (existsIndex > -1) {
-					annotations.remove(existsIndex);
+				AnnotationProxy ap = (AnnotationProxy) arg;
+				if (ap.getProperties().containsKeyAndNotNull(TiC.PROPERTY_ID)) {
+					id = ap.getProperties().getString(TiC.PROPERTY_ID);
+				} else {
+					title = TiConvert.toString(((AnnotationProxy) arg).getProperty("title"));
 				}
+			} else if (arg instanceof KrollDict) {
+				KrollDict dict = (KrollDict) arg;
+				if (dict.containsKeyAndNotNull(TiC.PROPERTY_ID)) {
+					id = dict.getString(TiC.PROPERTY_ID);
+				} else {
+					title = dict.getString(TiC.PROPERTY_TITLE);
+				}
+			} else if (arg instanceof String) {
+				title = (String) arg;
+			} else {
+				Log.d(LCAT, "Unsupported parameter: " + arg.getClass().getSimpleName());
 			}
-            if (updateDisplay && mapView != null) {
-                mapView.updateAnnotations();
-            }
+		}
 
+		if (id != null) {
+			if (annotations.remove(new TiAnnotation(id))) {
+				if ((updateDisplay == null || updateDisplay.equals(Boolean.TRUE)) && mapView != null) {
+					mapView.updateAnnotations();
+				}
+			} else {
+				Log.d(LCAT, "Unable to find annotation having id: " + id);
+			}
+		} else if (title != null) {
+			int existsIndex = findAnnotation(title);
+			if (existsIndex > -1) {
+				annotations.remove(existsIndex);
+                if ((updateDisplay == null || updateDisplay.equals(Boolean.TRUE)) && mapView != null) {
+                    mapView.updateAnnotations();
+                }
+			}
 		}
 	}
 
@@ -315,7 +310,15 @@ public class ViewProxy extends TiViewProxy
                     if (ap.getProperties().containsKeyAndNotNull(TiC.PROPERTY_TITLE)) {
                         title = TiConvert.toString(ap.getProperty(TiC.PROPERTY_TITLE));
                     }
-				} else {
+				} else if (selectedAnnotation instanceof KrollDict) {
+                    KrollDict dict = (KrollDict) selectedAnnotation;
+                    if (dict.containsKeyAndNotNull(TiC.PROPERTY_ID)) {
+					    id = dict.getString(TiC.PROPERTY_ID);
+                    }
+                    if (dict.containsKeyAndNotNull(TiC.PROPERTY_TITLE)) {
+					    title = dict.getString(TiC.PROPERTY_TITLE);
+                    }
+                } else {
 					title = params.getString(TiC.PROPERTY_TITLE);
 				}
 
@@ -354,7 +357,9 @@ public class ViewProxy extends TiViewProxy
 				Log.e(LCAT, "calling selectedAnnotations.add2");
 				mapView.selectAnnotation(true, id, title, animate, center);
 			}
-		}
+		} else {
+            Log.d(LCAT, "Unable to retrieve title or id from the parameter");
+        }
 	}
 
 	@Kroll.method
@@ -371,7 +376,15 @@ public class ViewProxy extends TiViewProxy
                 if (ap.getProperties().containsKeyAndNotNull(TiC.PROPERTY_TITLE)) {
 				    title = TiConvert.toString(((AnnotationProxy) args[0]).getProperty("title"));
                 }
-			} else if (args[0] instanceof String) {
+			} else if (args[0] instanceof KrollDict) {
+                KrollDict dict = (KrollDict) args[0];
+                if (dict.containsKeyAndNotNull(TiC.PROPERTY_ID)) {
+				    id = dict.getString(TiC.PROPERTY_ID);
+                }
+                if (dict.containsKeyAndNotNull(TiC.PROPERTY_TITLE)) {
+				    title = dict.getString(TiC.PROPERTY_TITLE);
+                }
+            } if (args[0] instanceof String) {
 				title = TiConvert.toString(args[0]);
 			}
 		}
@@ -385,9 +398,14 @@ public class ViewProxy extends TiViewProxy
 			if (mapView == null) {
 				int numSelectedAnnotations = selectedAnnotations.size();
 				for(int i = 0; i < numSelectedAnnotations; i++) {
-					if((selectedAnnotations.get(i)).title.equals(title)) {
+                    if (id != null) {
+                        TiMapView.SelectedAnnotation ann = selectedAnnotations.get(i);
+                        if (ann.id != null && ann.id.equals(id)) {
+                            selectedAnnotations.remove(i);
+                        }
+                    } else if((selectedAnnotations.get(i)).title.equals(title)) {
 						selectedAnnotations.remove(i);
-					}
+	    		    }
 				}
 			} else {
 				mapView.selectAnnotation(false, id, title, animate, false);
