@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
+import android.graphics.drawable.BitmapDrawable;
 import org.apache.commons.codec.binary.Base64;
+import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.io.TiBaseFile;
@@ -23,11 +25,20 @@ import org.appcelerator.titanium.util.TiMimeTypeHelper;
 import org.appcelerator.titanium.util.TiStreamHelper;
 
 import android.graphics.Bitmap;
-import android.graphics.Bitmap.CompressFormat;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
 
 @Kroll.proxy
 public class TiBlob extends KrollProxy
 {
+    public static final String BITMAP_MIMETYPE = "image/bitmap";
+    public static final String TEXT_MIMETYPE = "text/plain";
+
 	private static final String LCAT = "TiBlob";
 	private static final boolean DBG = TiConfig.LOGD;
 
@@ -53,7 +64,7 @@ public class TiBlob extends KrollProxy
 
 	public static TiBlob blobFromString(TiContext tiContext, String data)
 	{
-		return new TiBlob(tiContext, TYPE_STRING, data, "text/plain");
+		return new TiBlob(tiContext, TYPE_STRING, data, TEXT_MIMETYPE);
 	}
 
 	public static TiBlob blobFromFile(TiContext tiContext, TiBaseFile file)
@@ -69,15 +80,13 @@ public class TiBlob extends KrollProxy
 		return new TiBlob(tiContext, TYPE_FILE, file, mimeType);
 	}
 
-	public static TiBlob blobFromImage(TiContext tiContext, Bitmap image)
-	{
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		byte data[] = new byte[0];
-		if (image.compress(CompressFormat.PNG, 100, bos)) {
-			data = bos.toByteArray();
-		}
+    public static TiBlob blobFromImage(TiContext tiContext, Bitmap image) {
+        return TiBlob.blobFromImage(tiContext, image, TiBlob.BITMAP_MIMETYPE);
+    }
 
-		TiBlob blob = new TiBlob(tiContext, TYPE_IMAGE, data, "image/bitmap");
+	public static TiBlob blobFromImage(TiContext tiContext, Bitmap image, String mimetype)
+	{
+		TiBlob blob = new TiBlob(tiContext, TYPE_IMAGE, image, mimetype);
 		blob.width = image.getWidth();
 		blob.height = image.getHeight();
 		return blob;
@@ -96,6 +105,20 @@ public class TiBlob extends KrollProxy
 		return new TiBlob(tiContext, TYPE_DATA, data, mimetype);
 	}
 
+    private byte[] getBitmapBytes(Bitmap bmp, String mimetype) {
+        Bitmap.CompressFormat format = Bitmap.CompressFormat.PNG;
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte data[] = new byte[0];
+        if (mimetype != null
+                && (mimetype.toLowerCase().contains("jpeg") || mimetype.toLowerCase().contains("jpg"))) {
+            format = Bitmap.CompressFormat.JPEG;
+        }
+        if (bmp.compress(format, 100, bos)) {
+            data = bos.toByteArray();
+        }
+        return data;
+    }
+
 	public byte[] getBytes()
 	{
 		byte[] bytes = new byte[0];
@@ -109,9 +132,10 @@ public class TiBlob extends KrollProxy
 				}
 				break;
 			case TYPE_DATA:
+                bytes = (byte[]) data;
+                break;
 			case TYPE_IMAGE:
-				//TODO deal with mimetypes.
-				bytes = (byte[]) data;
+                bytes = getBitmapBytes((Bitmap)data, getMimeType());
 				break;
 			case TYPE_FILE:	
 				InputStream stream = getInputStream();
@@ -141,8 +165,8 @@ public class TiBlob extends KrollProxy
 			case TYPE_FILE:
 				return (int) ((TiBaseFile)data).size();
 			case TYPE_DATA:
+                return ((byte[])data).length;
 			case TYPE_IMAGE:
-				return ((byte[])data).length;
 			default:
 				// this is probably overly expensive.. is there a better way?
 				return getBytes().length;
@@ -177,6 +201,13 @@ public class TiBlob extends KrollProxy
 				}
 				break;
 			case TYPE_IMAGE:
+                byte[] dBytes = getBytes();
+                byte[] aBytes = blob.getBytes();
+                byte[] nData = new byte[dBytes.length + aBytes.length];
+                System.arraycopy(dBytes, 0, nData, 0, dBytes.length);
+                System.arraycopy(aBytes, 0, nData, dBytes.length, aBytes.length);
+                data = nData;
+                break;
 			case TYPE_DATA :
 				byte[] dataBytes = (byte[]) data;
 				byte[] appendBytes = blob.getBytes();
@@ -312,4 +343,117 @@ public class TiBlob extends KrollProxy
 	{
 		return new String(Base64.encodeBase64(getBytes()));
 	}
+	
+	@Kroll.method
+	public TiBlob imageAsResized(int iWidth, int iHeight) {
+        Bitmap bmpInput = getBitmapFromData();
+        Bitmap bmpScaled = Bitmap.createScaledBitmap(bmpInput, iWidth, iHeight, false);
+		return TiBlob.blobFromImage(this.context, bmpScaled, this.getMimeType());
+	}
+	
+	@Kroll.method
+	public TiBlob imageAsCropped(@Kroll.argument(optional=false) KrollDict config) {
+		double dx=0.0, dy=0.0, dWidth=0.0, dHeight=0.0;
+		
+		if (!config.containsKeyAndNotNull("x")
+				|| !config.containsKeyAndNotNull("y")
+				|| !config.containsKeyAndNotNull("width")
+				|| !config.containsKeyAndNotNull("height")) {
+			throw new IllegalStateException("imageAsCropped:Failed, missing some config parameters (x,y,width,height)");					
+		}
+		
+		dx = config.getDouble("x");
+		dy = config.getDouble("y");
+		dWidth = config.getDouble("width");
+		dHeight = config.getDouble("height");
+
+        Bitmap bmpInput = getBitmapFromData();
+		Bitmap bmpCropped = Bitmap.createBitmap(bmpInput, (int)dx, (int)dy, (int)dWidth, (int)dHeight);
+		return TiBlob.blobFromImage(this.context, bmpCropped, this.getMimeType());
+	}
+
+	@Kroll.method
+	public TiBlob imageWithRoundedCorner(int cornerSize, @Kroll.argument(optional=true) Integer borderSize) {
+		Bitmap bmpInput = getBitmapFromData();
+        int bSize = (borderSize == null) ? 0 : borderSize;
+		int width = bmpInput.getWidth();
+		int height = bmpInput.getHeight();
+		
+		Bitmap rounder = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+		Canvas canvas = new Canvas(rounder);
+		Paint xferPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+		xferPaint.setColor(Color.RED);
+		
+		canvas.drawRoundRect(new RectF(0,0,width, height), cornerSize, cornerSize, xferPaint);
+		
+		xferPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+		
+		
+		Bitmap bmpOutput = null;
+		if (bSize <= 0) {
+			bmpOutput = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+			canvas = new Canvas(bmpOutput);
+			canvas.drawBitmap(bmpInput, 0, 0, null);
+			canvas.drawBitmap(rounder, 0, 0, xferPaint);
+		} else {
+			bmpOutput = Bitmap.createBitmap(width + (bSize * 2), height + (bSize * 2),
+					Bitmap.Config.ARGB_8888);
+
+			canvas = new Canvas(bmpOutput);
+			canvas.drawBitmap(bmpInput, bSize, bSize, null);
+			canvas.drawBitmap(rounder, bSize, bSize, xferPaint);
+		}
+		
+		return TiBlob.blobFromImage(this.context, bmpOutput, this.getMimeType());
+	}
+	
+	@Kroll.method
+	public TiBlob imageWithTransparentBorder(int size) {
+		Bitmap bmpInput = getBitmapFromData();
+
+		int width = bmpInput.getWidth();
+		int height = bmpInput.getHeight();
+		
+		Bitmap bmpOutput =  Bitmap.createBitmap(width + (size * 2), height + (size * 2),
+				Bitmap.Config.ARGB_8888);
+
+		Canvas canvas = new Canvas(bmpOutput);
+		canvas.drawBitmap(bmpInput, size, size, null);
+		return TiBlob.blobFromImage(this.context, bmpOutput, this.getMimeType());
+	}
+
+	@Kroll.method
+	public TiBlob imageWithAlpha() {
+        Bitmap bmpInput = getBitmapFromData();
+		int width = bmpInput.getWidth();
+		int height = bmpInput.getHeight();
+			
+		Bitmap bmpOutput = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+		int[] pixels = new int[width * height];
+		bmpInput.getPixels(pixels, 0, width, 0, 0, width, height);
+		bmpOutput.setPixels(pixels, 0, width, 0, 0, width, height);
+		
+		return TiBlob.blobFromImage(this.context, bmpOutput, this.getMimeType());
+	}
+
+    /**
+     * Retrieve tha android bitmap based on the data.
+     * <p>If the data is a Bitmap, simply return it; otherwiser try to load
+     * the bitmap based on the bytes contained in the blob</p>
+     * @return The loaded bitmap
+     * @throw IllegalStateException If the blob doesn't contain a valid bitmap representation
+     */
+    private Bitmap getBitmapFromData() {
+        if (this.data instanceof Bitmap) {
+            return (Bitmap) data;
+        }
+        byte[] byImage = getBytes();
+        Bitmap bmpInput = BitmapFactory.decodeByteArray(byImage, 0, byImage.length);
+        Log.d(LCAT, "getBitmapData::Decoded " + byImage.length + " bytes from input blob");
+        if (byImage.length == 0 || bmpInput == null) {
+            throw new IllegalStateException("Could not parse the input image");
+        }
+
+        return bmpInput;
+    }
 }
