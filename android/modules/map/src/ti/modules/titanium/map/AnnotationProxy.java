@@ -15,6 +15,7 @@ import org.appcelerator.titanium.util.TiConfig;
 
 @Kroll.proxy(creatableInModule=MapModule.class)
 @Kroll.dynamicApis(properties = {
+    TiC.PROPERTY_ID,
 	TiC.PROPERTY_ANIMATE,
 	TiC.PROPERTY_IMAGE,
 	TiC.PROPERTY_LEFT_BUTTON,

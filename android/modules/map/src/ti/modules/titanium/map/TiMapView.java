@@ -267,15 +267,17 @@ public class TiMapView extends TiUIView
 	}
 
 	public static class SelectedAnnotation {
+        String id;
 		String title;
 		boolean animate;
 		boolean center;
 
-		public SelectedAnnotation(String title, boolean animate, boolean center) {
-			this.title = title;
-			this.animate = animate;
-			this.center = center;
-		}
+        public SelectedAnnotation(String id, String title, boolean animate, boolean center) {
+            this.id = id;
+            this.title = title;
+            this.animate = animate;
+            this.center = center;
+        }
 	}
 	
 	public TiMapView(TiViewProxy proxy, Window mapWindow, ArrayList<AnnotationProxy> annotations, ArrayList<SelectedAnnotation>selectedAnnotations)
@@ -427,9 +429,10 @@ public class TiMapView extends TiUIView
 				Bundle args = msg.getData();
 				boolean select = args.getBoolean("select", false);
 				String title = args.getString("title");
+                String id = args.getString("id");
 				boolean animate = args.getBoolean("animate", false);
 				boolean center = args.getBoolean("center", true); // keep existing default behavior
-				doSelectAnnotation(select, title, animate, center);
+				doSelectAnnotation(select, id, title, animate, center);
 				return true;
 
 			case MSG_UPDATE_ANNOTATIONS :
@@ -615,7 +618,7 @@ public class TiMapView extends TiUIView
 						if (DBG) {
 							Log.d(LCAT, "Executing internal call to selectAnnotation:" + annotation.title);
 						}
-						selectAnnotation(true, annotation.title, annotation.animate, annotation.center);
+						selectAnnotation(true, annotation.id, annotation.title, annotation.animate, annotation.center);
 					}
 				}
 
@@ -624,13 +627,14 @@ public class TiMapView extends TiUIView
 		}
 	}
 
-	public void selectAnnotation(boolean select, String title, boolean animate, boolean center)
+	public void selectAnnotation(boolean select, String id, String title, boolean animate, boolean center)
 	{
 		if (title != null) {
 			Log.e(LCAT, "calling obtainMessage");
 
 			Bundle args = new Bundle();
 			args.putBoolean("select", select);
+            args.putString("id", id);
 			args.putString("title", title);
 			args.putBoolean("animate", animate);
 			args.putBoolean("center", center);
@@ -641,40 +645,45 @@ public class TiMapView extends TiUIView
 		}
 	}
 
-	public void doSelectAnnotation(boolean select, String title, boolean animate, boolean center)
+	public void doSelectAnnotation(boolean select, String id, String title, boolean animate, boolean center)
 	{
-		if (title != null && view != null && annotations != null && overlay != null) {
-			int index = ((ViewProxy)proxy).findAnnotation(title);
-			if (index > -1) {
-				if (overlay != null) {
-					synchronized(overlay) {
-						TiOverlayItem item = overlay.getItem(index);
+        if (view != null && annotations != null && overlay != null) {
+            int index = -1;
+            if (id != null) {
+                index = ((ViewProxy)proxy).findAnnotationById(id);
+            } else if (title != null) {
+                index = ((ViewProxy)proxy).findAnnotation(title);
+            }
+            if (index > -1) {
+                if (overlay != null) {
+                    synchronized(overlay) {
+                        TiOverlayItem item = overlay.getItem(index);
 
-						if (select) {
-							if (itemView != null && index == itemView.getLastIndex() && itemView.getVisibility() != View.VISIBLE) {
-								showAnnotation(index, item);
-								return;
-							}
+                        if (select) {
+                            if (itemView != null && index == itemView.getLastIndex() && itemView.getVisibility() != View.VISIBLE) {
+                                showAnnotation(index, item);
+                                return;
+                            }
 
-							hideAnnotation();
+                            hideAnnotation();
 
-							if (center) {
-								MapController controller = view.getController();
-								if (animate) {
-									controller.animateTo(item.getPoint());
-								} else {
-									controller.setCenter(item.getPoint());
-								}
-							}
-							showAnnotation(index, item);
+                            if (center) {
+                                MapController controller = view.getController();
+                                if (animate) {
+                                    controller.animateTo(item.getPoint());
+                                } else {
+                                    controller.setCenter(item.getPoint());
+                                }
+                            }
+                            showAnnotation(index, item);
 
-						} else {
-							hideAnnotation();
-						}
-					}
-				}
-			}
-		}
+                        } else {
+                            hideAnnotation();
+                        }
+                    }
+                }
+            }
+        }
 	}
 
 	public void doUserLocation(boolean userLocation)
