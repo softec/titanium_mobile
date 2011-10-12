@@ -102,7 +102,7 @@
 	
 	for (UIImage *image in [self controller].icons)
 	{
-		TiBlob *blob = [[TiBlob alloc] initWithImage:image];
+		TiBlob *blob = [[TiBlob alloc] initWithImage:image mimetype:@"image/jpeg"];
 		[result addObject:image];
 		[blob release];
 	}

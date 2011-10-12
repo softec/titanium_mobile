@@ -138,7 +138,7 @@ static NSString *mimeTypeToUTType(NSString *mimeType)
 		{
 			UIImage *image = board.image;
 			if (image) {
-				return [[TiBlob alloc] initWithImage: image];
+				return [[TiBlob alloc] initWithImage:image mimetype:mimeType];
 			} else {
 				return nil;
 			}

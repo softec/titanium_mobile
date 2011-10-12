@@ -136,13 +136,13 @@ static NSArray* imageKeySequence;
 		
 		if (image!=nil)
 		{
-			return [[[TiBlob alloc] initWithImage:image] autorelease];
+			return [[[TiBlob alloc] initWithImage:image mimetype:@"image/jpeg"] autorelease];
 		}
 
 		// we're on the non-UI thread, we need to block to load
 
 		image = [[ImageLoader sharedLoader] loadRemote:url_];
-		return [[[TiBlob alloc] initWithImage:image] autorelease];
+		return [[[TiBlob alloc] initWithImage:image mimetype:@"image/jpeg"] autorelease];
 	}
 	return nil;
 }

@@ -97,13 +97,13 @@
 	return 0;
 }
 
--(id)initWithImage:(UIImage*)image_
+-(id)initWithImage:(UIImage*)image_ mimetype:(NSString*)mimetype_
 {
 	if (self = [super init])
 	{
 		image = [image_ retain];
 		type = TiBlobTypeImage;
-		mimetype = [@"image/jpeg" retain];
+		mimetype = [mimetype_ retain];
 	}
 	return self;
 }
@@ -169,6 +169,9 @@
 		}
 		case TiBlobTypeImage:
 		{
+            if (mimetype == @"image/png") {
+                return UIImagePNGRepresentation(image);
+            }
 			return UIImageJPEGRepresentation(image,1.0);
 		}
 	}
@@ -284,7 +287,7 @@
 	[self ensureImageLoaded];
 	if (image!=nil)
 	{
-		return [[[TiBlob alloc] initWithImage:[UIImageAlpha imageWithAlpha:image]] autorelease];
+		return [[[TiBlob alloc] initWithImage:[UIImageAlpha imageWithAlpha:image] mimetype:mimetype] autorelease];
 	}
 	return nil;
 }
@@ -296,7 +299,7 @@
 	{
 		ENSURE_SINGLE_ARG(args,NSObject);
 		NSUInteger size = [TiUtils intValue:args];
-		return [[[TiBlob alloc] initWithImage:[UIImageAlpha transparentBorderImage:size image:image]] autorelease];
+		return [[[TiBlob alloc] initWithImage:[UIImageAlpha transparentBorderImage:size image:image] mimetype:mimetype] autorelease];
 	}
 	return nil;
 }
@@ -308,7 +311,7 @@
 	{
 		NSUInteger cornerSize = [TiUtils intValue:[args objectAtIndex:0]];
 		NSUInteger borderSize = [args count] > 1 ? [TiUtils intValue:[args objectAtIndex:1]] : 1;
-		return [[[TiBlob alloc] initWithImage:[UIImageRoundedCorner roundedCornerImage:cornerSize borderSize:borderSize image:image]] autorelease];
+		return [[[TiBlob alloc] initWithImage:[UIImageRoundedCorner roundedCornerImage:cornerSize borderSize:borderSize image:image] mimetype:mimetype] autorelease];
 	}
 	return nil;
 }
@@ -325,7 +328,7 @@
 												  transparentBorder:borderSize
 													   cornerRadius:cornerRadius
 											   interpolationQuality:kCGInterpolationHigh
-															  image:image]] 
+															  image:image] mimetype:mimetype] 
 				autorelease];
 	}
 	return nil;
@@ -339,7 +342,7 @@
 		ENSURE_ARG_COUNT(args,2);
 		NSUInteger width = [TiUtils intValue:[args objectAtIndex:0]];
 		NSUInteger height = [TiUtils intValue:[args objectAtIndex:1]];
-		return [[[TiBlob alloc] initWithImage:[UIImageResize resizedImage:CGSizeMake(width, height) interpolationQuality:kCGInterpolationHigh image:image hires:NO]] autorelease];
+		return [[[TiBlob alloc] initWithImage:[UIImageResize resizedImage:CGSizeMake(width, height) interpolationQuality:kCGInterpolationHigh image:image hires:NO] mimetype:mimetype] autorelease];
 	}
 	return nil;
 }
@@ -356,7 +359,7 @@
 		bounds.size.height = [TiUtils floatValue:@"height" properties:args def:imageSize.height];
 		bounds.origin.x = [TiUtils floatValue:@"x" properties:args def:(imageSize.width - bounds.size.width) / 2.0];
 		bounds.origin.y = [TiUtils floatValue:@"y" properties:args def:(imageSize.height - bounds.size.height) / 2.0];
-		return [[[TiBlob alloc] initWithImage:[UIImageResize croppedImage:bounds image:image]] autorelease];
+		return [[[TiBlob alloc] initWithImage:[UIImageResize croppedImage:bounds image:image] mimetype:mimetype] autorelease];
 	}
 	return nil;
 }

@@ -275,7 +275,7 @@ static NSDictionary* multiValueLabels;
 	CFDataRef imageData = ABPersonCopyImageData([self record]);
 	if (imageData != NULL)
 	{
-		TiBlob* imageBlob = [[[TiBlob alloc] initWithImage:[UIImage imageWithData:(NSData*)imageData]] autorelease];
+		TiBlob* imageBlob = [[[TiBlob alloc] initWithImage:[UIImage imageWithData:(NSData*)imageData] mimetype:@"image/jpeg"] autorelease];
 		CFRelease(imageData);
 		
 		[returnCache setObject:imageBlob forKey:@"image"];

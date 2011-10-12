@@ -36,7 +36,7 @@ typedef enum {
 // for image, returns the width x height
 @property(nonatomic,readonly) NSInteger size;
 
--(id)initWithImage:(UIImage*)image;
+-(id)initWithImage:(UIImage*)image mimetype:(NSString*)mimetype_;
 -(id)initWithData:(NSData*)data_ mimetype:(NSString*)mimetype_;
 -(id)initWithFile:(NSString*)path;
 

@@ -418,7 +418,7 @@ static NSDictionary* TI_filterableItemProperties;
 -(void)saveCompletedForImage:(UIImage*)image error:(NSError*)error contextInfo:(void*)contextInfo
 {
 	NSDictionary* saveCallbacks = (NSDictionary*)contextInfo;
-	TiBlob* blob = [[[TiBlob alloc] initWithImage:image] autorelease];
+	TiBlob* blob = [[[TiBlob alloc] initWithImage:image mimetype:@"image/jpeg"] autorelease];
 	
 	if (error != nil) {
 		KrollCallback* errorCallback = [saveCallbacks objectForKey:@"error"];
@@ -934,7 +934,7 @@ if (![TiUtils isIOS4OrGreater]) { \
 
     UIGraphicsEndImageContext();
 
-	TiBlob *blob = [[[TiBlob alloc] initWithImage:image] autorelease];
+	TiBlob *blob = [[[TiBlob alloc] initWithImage:image mimetype:@"image/jpeg"] autorelease];
 	NSDictionary *event = [NSDictionary dictionaryWithObject:blob forKey:@"media"];
 	[self _fireEventToListener:@"screenshot" withObject:event listener:arg thisObject:nil];
 }
@@ -1230,7 +1230,7 @@ if (![TiUtils isIOS4OrGreater]) { \
 			UISaveVideoAtPathToSavedPhotosAlbum(tempFilePath, nil, nil, NULL);
 		}
 		UIImage *thumbnailImage = [editingInfo objectForKey:UIImagePickerControllerOriginalImage];
-		thumbnail = [[[TiBlob alloc] initWithImage:thumbnailImage] autorelease];
+		thumbnail = [[[TiBlob alloc] initWithImage:thumbnailImage mimetype:@"image/jpeg"] autorelease];
 	}
 	else
 	{
@@ -1251,7 +1251,7 @@ if (![TiUtils isIOS4OrGreater]) { \
 		{
 			UIImage *image = (editedImage != nil)?editedImage:
 					[editingInfo objectForKey:UIImagePickerControllerOriginalImage];
-			media = [[[TiBlob alloc] initWithImage:image] autorelease];
+			media = [[[TiBlob alloc] initWithImage:image mimetype:@"image/jpeg"] autorelease];
 			if (saveToRoll)
 			{
 				UIImageWriteToSavedPhotosAlbum(image, nil, nil, NULL);
