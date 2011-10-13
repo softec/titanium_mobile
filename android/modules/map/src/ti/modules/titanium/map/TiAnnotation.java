@@ -15,6 +15,8 @@ package ti.modules.titanium.map;
 
 import java.util.UUID;
 
+import android.graphics.drawable.Drawable;
+import com.google.android.maps.GeoPoint;
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.titanium.TiC;
 import org.appcelerator.titanium.proxy.TiViewProxy;
@@ -29,6 +31,8 @@ import android.graphics.Color;
  *
  */
 public class TiAnnotation {
+    private static final String LCAT = "TiAnnotation";
+
 	private String id;
 	private String title;
 	private String subtitle;
@@ -293,4 +297,5 @@ public class TiAnnotation {
 		}
 		return a;
 	}
+
 }

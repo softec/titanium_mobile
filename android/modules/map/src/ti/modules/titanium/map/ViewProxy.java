@@ -34,11 +34,15 @@ import android.view.Window;
 	TiC.PROPERTY_MAP_TYPE,
 	TiC.PROPERTY_REGION,
 	TiC.PROPERTY_REGION_FIT,
-	TiC.PROPERTY_USER_LOCATION
+	TiC.PROPERTY_USER_LOCATION,
+    TiC.PROPERTY_ANCHOR_POINT,
+    ViewProxy.PROPERTY_DRAW_SHADOW
 })
 public class ViewProxy extends TiViewProxy 
 	implements OnLifecycleEvent 
 {
+    public static final String PROPERTY_DRAW_SHADOW = "drawShadow";
+
 	private static LocalActivityManager lam;
 	private static Window mapWindow;
 	private static OnLifecycleEvent rootLifecycleListener;
@@ -127,6 +131,14 @@ public class ViewProxy extends TiViewProxy
 			}
 		}
 
+        Object shadow = getProperty(ViewProxy.PROPERTY_DRAW_SHADOW);
+        if (shadow != null) {
+            if (shadow instanceof Boolean) {
+                mapView.doSetDrawShadow((Boolean)shadow);
+            } else {
+                Log.e(LCAT, "Incorrect drawShadow format " + shadow.getClass().getName());
+            }
+        }
 		mapView.updateAnnotations();
 
 		return mapView;
@@ -429,6 +441,14 @@ public class ViewProxy extends TiViewProxy
 	{
 		this.setProperty(TiC.PROPERTY_MAP_TYPE, mapType, true);
 	}
+
+    @Kroll.method
+    public void setDrawShadow(boolean shadow) {
+        setProperty(ViewProxy.PROPERTY_DRAW_SHADOW, shadow);
+        if (mapView != null) {
+            mapView.doSetDrawShadow(shadow);
+        }
+    }
 
 	public void onDestroy(Activity activity) {
 		if (lam != null && !destroyed) {

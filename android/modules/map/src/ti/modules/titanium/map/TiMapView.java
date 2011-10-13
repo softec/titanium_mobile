@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.graphics.Canvas;
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.titanium.TiApplication;
@@ -81,11 +82,15 @@ public class TiMapView extends TiUIView
 	private static final int MSG_SELECT_ANNOTATION = 309;
 	private static final int MSG_REMOVE_ALL_ANNOTATIONS = 310;
 	private static final int MSG_UPDATE_ANNOTATIONS = 311;
+    private static final int MSG_SET_DRAWSHADOW = 312;
 
 	private boolean scrollEnabled;
 	private boolean regionFit;
 	private boolean animate;
 	private boolean userLocation;
+    private boolean drawShadow = false;
+    private float anchorX = 0.5f;
+    private float anchorY = 0.5f;
 
 	private LocalMapView view;
 	private Window mapWindow;
@@ -95,7 +100,6 @@ public class TiMapView extends TiUIView
 	private ArrayList<TiAnnotation> annotations;
 	private ArrayList<SelectedAnnotation> selectedAnnotations;
 	private Handler handler;
-
 	class LocalMapView extends MapView
 	{
 		private boolean scrollEnabled;
@@ -157,7 +161,7 @@ public class TiMapView extends TiUIView
 		TitaniumOverlayListener listener;
 
 		public TitaniumOverlay(Drawable defaultDrawable, TitaniumOverlayListener listener) {
-			super(defaultDrawable);
+			super(setMarkerBounds(defaultDrawable));
 			this.listener = listener;
 		}
 
@@ -165,6 +169,15 @@ public class TiMapView extends TiUIView
 			this.annotations = new ArrayList<TiAnnotation>(annotations);
 			populate();
 		}
+
+        @Override
+        public void draw(Canvas canvas, MapView mapView, boolean shadow) {
+            if (drawShadow && shadow) {
+                super.draw(canvas, mapView, shadow);
+            } else if (!shadow) {
+                super.draw(canvas, mapView, shadow);
+            }
+        }
 
         @Override
         protected TiOverlayItem createItem(int i) {
@@ -180,11 +193,11 @@ public class TiMapView extends TiUIView
                 Drawable marker = null;
                 if (a.getImage() != null) {
                     marker = makeMarker(a.getImage());
-                    item.setMarker(marker);
+                    item.setMarker(setMarkerBounds(marker));
                 }
                 if (marker == null && a.getPinColor() != null) {
                     marker = makeMarker(a.getPinColor().intValue());
-                    item.setMarker(marker);
+                    item.setMarker(setMarkerBounds(marker));
                 } else {
                     Log.d(LCAT, "No image or color specified for marker, using blue color");
                 }
@@ -340,6 +353,39 @@ public class TiMapView extends TiUIView
 		});
 	}
 
+    /**
+     * Set the marker bounds according to the anchorPoint.
+     * @param marker The marker whose bounds should be adapted.
+     * @return the marker parameter with it's bounds set.
+     */
+    private Drawable setMarkerBounds(Drawable marker) {
+        // Move bounds x,y value according to the anchor center.
+        // So if the center is a (17, 37) we need to setBounds(-17, -37, -17 + width, -37 + height)
+        int width = marker.getIntrinsicWidth();
+        int height = marker.getIntrinsicHeight();
+
+        if (width == 0) {
+            width = marker.getBounds().width();
+        }
+        if (height == 0) {
+            height = marker.getBounds().height();
+        }
+        Log.d(LCAT,"Original size (" + width + ", " + height + ")");
+
+        int left = 0;
+        int top = 0;
+        if (anchorX >= 0.0 && anchorX < 1.0) {
+            left = (int) - (width * anchorX);
+            top = (int) - (height * anchorY);
+        }
+        int right = left + width;
+        int bottom = top + width;
+
+        marker.setBounds(left, top, right, bottom);
+        Log.d(LCAT, "Setting marker bounds to (" + left + ", " + top + ", " + right + ", " + bottom + ")");
+        return marker;
+    }
+
 	private LocalMapView getView() {
 		return view;
 	}
@@ -396,6 +442,11 @@ public class TiMapView extends TiUIView
 			case MSG_UPDATE_ANNOTATIONS :
 				doUpdateAnnotations();
 				return true;
+
+            case MSG_SET_DRAWSHADOW:
+                drawShadow = msg.arg1 == 1 ? true : false;
+                doSetDrawShadow(drawShadow);
+                return true;
 		}
 
 		return false;
@@ -484,6 +535,12 @@ public class TiMapView extends TiUIView
 			}
 			doSetAnnotations(this.annotations);
 		}
+        if (d.containsKey(ViewProxy.PROPERTY_DRAW_SHADOW)) {
+            doSetDrawShadow(d.getBoolean(ViewProxy.PROPERTY_DRAW_SHADOW));
+        }
+        if (d.containsKey(TiC.PROPERTY_ANCHOR_POINT)) {
+            doSetAnchorPoint(d.getKrollDict(TiC.PROPERTY_ANCHOR_POINT));
+        }
 		super.processProperties(d);
 	}
 
@@ -504,7 +561,21 @@ public class TiMapView extends TiUIView
 			} else {
 				doSetMapType(TiConvert.toInt(newValue));
 			}
-		} else {
+		} else if (key.equals(ViewProxy.PROPERTY_DRAW_SHADOW)) {
+            if (newValue == null) {
+                doSetDrawShadow(true);
+            } else {
+                doSetDrawShadow(TiConvert.toBoolean(newValue));
+            }
+        } else if (key.equals(TiC.PROPERTY_ANCHOR_POINT)) {
+            if (newValue != null) {
+                if (newValue instanceof KrollDict) {
+                    doSetAnchorPoint((KrollDict) newValue);
+                }
+            } else {
+                doSetAnchorPoint(0.5f, 0.5f);
+            }
+        } else {
 			super.propertyChanged(key, oldValue, newValue, proxy);
 		}
 	}
@@ -551,6 +622,28 @@ public class TiMapView extends TiUIView
 			}
 		}
 	}
+
+    public void doSetAnchorPoint(KrollDict dict) {
+        if (dict != null) {
+            Float x = null;
+            Float y = null;
+            if (dict.containsKeyAndNotNull("x")) {
+                x = dict.getDouble("x").floatValue();
+            }
+            if (dict.containsKeyAndNotNull("y")) {
+                y = dict.getDouble("y").floatValue();
+            }
+            doSetAnchorPoint(x, y);
+        }
+    }
+    public void doSetAnchorPoint(Float anchorX, Float anchorY) {
+        this.anchorX = anchorX == null ? 0.5f : anchorX;
+        this.anchorY = anchorY == null ? 0.5f : anchorY;
+        Log.e(LCAT, "Setting anchor location to " + this.anchorX + ", " + this.anchorY);
+        if (this.overlay != null) {
+            doUpdateAnnotations();
+        }
+    }
 
 	public void doSetAnnotations(ArrayList<TiAnnotation> annotations)
 	{
@@ -677,6 +770,14 @@ public class TiMapView extends TiUIView
 		}
 	}
 
+    public void doSetDrawShadow(boolean shadow) {
+        Log.i(LCAT, "doSetDragShadow " + shadow);
+        this.drawShadow = shadow;
+        if (this.overlay != null) {
+            this.view.postInvalidate();
+        }
+    }
+
 	public void changeZoomLevel(int delta) {
 		handler.obtainMessage(MSG_CHANGE_ZOOM, delta, 0).sendToTarget();
 	}
@@ -705,11 +806,13 @@ public class TiMapView extends TiUIView
 		}
 		return null;
 	}
-	private double scaleFromGoogle(int value) {
-		return (double)value / 1000000.0;
-	}
 
-	private int scaleToGoogle(double value) {
-		return (int)(value * 1000000);
-	}
+    private double scaleFromGoogle(int value) {
+        return (double)value / 1000000.0;
+    }
+
+    private int scaleToGoogle(double value) {
+        return (int)(value * 1000000);
+    }
+
 }
