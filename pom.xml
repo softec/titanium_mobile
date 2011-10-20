@@ -22,6 +22,49 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-rhino</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.mozilla.javascript</groupId>
+                  <artifactId>rhino-titanium</artifactId>
+                  <version>1.7R3-softec</version>
+                  <type>zip</type>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>${project.basedir}/android/titanium/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.6</version>
+        <executions>
+          <execution>
+            <id>unpack-rhino</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <copy file="${project.basedir}/android/titanium/lib/js.jar" tofile="${project.basedir}/android/titanium/lib/js-debug.jar"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>1.1</version>
@@ -66,17 +109,17 @@
             <goals>
               <goal>attach-artifact</goal>
             </goals>
+            <configuration>
+              <artifacts>
+                <artifact>
+                  <file>${project.basedir}/dist/mobilesdk-${project.version}-${titanium.suffix}.zip</file>
+                  <type>zip</type>
+                  <classifier>${titanium.suffix}</classifier>
+                </artifact>
+              </artifacts>
+            </configuration>
           </execution>
         </executions>
-        <configuration>
-          <artifacts>
-            <artifact>
-              <file>${basedir}/dist/mobilesdk-${project.version}-${titanium.suffix}.zip</file>
-              <type>zip</type>
-              <classifier>${titanium.suffix}</classifier>
-            </artifact>
-          </artifacts>
-        </configuration>
       </plugin>
     </plugins>
   </build>
