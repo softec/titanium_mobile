@@ -54,13 +54,13 @@ public class TiOverlayItemView extends FrameLayout
 
 		lastIndex = -1;
 
-		setPadding(0, 0, 0, 10);
+		setPadding(0, 0, 0, 0);
 
-		layout = new RelativeLayout(context);
+		layout = new TiBubbleLayout(context);
 
 		layout.setBackgroundColor(Color.argb(200, 0, 0, 0));
 		layout.setGravity(Gravity.NO_GRAVITY);
-		layout.setPadding(4, 2, 4, 2);
+		layout.setPadding(10, 5, 10, 5);
 
 		RelativeLayout.LayoutParams params = null;
 
@@ -92,7 +92,7 @@ public class TiOverlayItemView extends FrameLayout
 
 		};
 		title.setId(200);
-		title.setTextColor(Color.argb(255, 216,216,216));
+		title.setTextColor(Color.WHITE);
 		title.setTag("title");
 		TiUIHelper.styleText(title, "sans-serif", "15sip", "bold");
 		params = createBaseParams();
