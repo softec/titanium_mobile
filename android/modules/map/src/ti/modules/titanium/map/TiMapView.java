@@ -7,30 +7,33 @@
 
 package ti.modules.titanium.map;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.graphics.Canvas;
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.titanium.TiApplication;
+import org.appcelerator.titanium.TiBlob;
 import org.appcelerator.titanium.TiC;
 import org.appcelerator.titanium.TiContext.OnLifecycleEvent;
 import org.appcelerator.titanium.TiProperties;
-import org.appcelerator.titanium.io.TiBaseFile;
-import org.appcelerator.titanium.io.TiFileFactory;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.Log;
 import org.appcelerator.titanium.util.TiConfig;
 import org.appcelerator.titanium.util.TiConvert;
-import org.appcelerator.titanium.util.TiUIHelper;
 import org.appcelerator.titanium.view.TiUIView;
+
+import com.google.android.maps.GeoPoint;
+import com.google.android.maps.ItemizedOverlay;
+import com.google.android.maps.MapController;
+import com.google.android.maps.MapView;
+import com.google.android.maps.MyLocationOverlay;
+import com.google.android.maps.Overlay;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.OvalShape;
@@ -43,13 +46,6 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.widget.Toast;
-
-import com.google.android.maps.GeoPoint;
-import com.google.android.maps.ItemizedOverlay;
-import com.google.android.maps.MapController;
-import com.google.android.maps.MapView;
-import com.google.android.maps.MyLocationOverlay;
-import com.google.android.maps.Overlay;
 
 interface TitaniumOverlayListener {
 	public void onTap(int index);
@@ -161,7 +157,7 @@ public class TiMapView extends TiUIView
 		TitaniumOverlayListener listener;
 
 		public TitaniumOverlay(Drawable defaultDrawable, TitaniumOverlayListener listener) {
-			super(setMarkerBounds(defaultDrawable));
+			super(boundedMarker(defaultDrawable));
 			this.listener = listener;
 		}
 
@@ -193,13 +189,11 @@ public class TiMapView extends TiUIView
                 Drawable marker = null;
                 if (a.getImage() != null) {
                     marker = makeMarker(a.getImage());
-                    item.setMarker(setMarkerBounds(marker));
+                    item.setMarker(boundedMarker(marker));
                 }
                 if (marker == null && a.getPinColor() != null) {
                     marker = makeMarker(a.getPinColor().intValue());
-                    item.setMarker(setMarkerBounds(marker));
-                } else {
-                    Log.d(LCAT, "No image or color specified for marker, using blue color");
+                    item.setMarker(boundedMarker(marker));
                 }
 
                 if (a.getLeftButton() != null) {
@@ -358,19 +352,18 @@ public class TiMapView extends TiUIView
      * @param marker The marker whose bounds should be adapted.
      * @return the marker parameter with it's bounds set.
      */
-    private Drawable setMarkerBounds(Drawable marker) {
+    private Drawable boundedMarker(Drawable marker) {
         // Move bounds x,y value according to the anchor center.
         // So if the center is a (17, 37) we need to setBounds(-17, -37, -17 + width, -37 + height)
         int width = marker.getIntrinsicWidth();
         int height = marker.getIntrinsicHeight();
 
-        if (width == 0) {
+        if (width <= 0) {
             width = marker.getBounds().width();
         }
-        if (height == 0) {
+        if (height <= 0) {
             height = marker.getBounds().height();
         }
-        Log.d(LCAT,"Original size (" + width + ", " + height + ")");
 
         int left = 0;
         int top = 0;
@@ -382,7 +375,6 @@ public class TiMapView extends TiUIView
         int bottom = top + width;
 
         marker.setBounds(left, top, right, bottom);
-        Log.d(LCAT, "Setting marker bounds to (" + left + ", " + top + ", " + right + ", " + bottom + ")");
         return marker;
     }
 
@@ -463,7 +455,7 @@ public class TiMapView extends TiUIView
 		if (view != null && itemView != null && item != null) {
 			itemView.setItem(index, item);
 			//Make sure the annotation is always on top of the marker
-			int y = -1*item.getMarker(TiOverlayItem.ITEM_STATE_FOCUSED_MASK).getIntrinsicHeight();
+			int y = item.getMarker(TiOverlayItem.ITEM_STATE_FOCUSED_MASK).getBounds().top;
 			MapView.LayoutParams params = new MapView.LayoutParams(LayoutParams.WRAP_CONTENT,
 					LayoutParams.WRAP_CONTENT, item.getPoint(), 0, y, MapView.LayoutParams.BOTTOM_CENTER);
 			params.mode = MapView.LayoutParams.MODE_MAP;
@@ -793,18 +785,10 @@ public class TiMapView extends TiUIView
 		return d;
 	}
 
-	private Drawable makeMarker(String pinImage)
+	private Drawable makeMarker(TiBlob image)
 	{
-		String url = proxy.getTiContext().resolveUrl(null, pinImage);
-		TiBaseFile file = TiFileFactory.createTitaniumFile(proxy.getTiContext(), new String[] { url }, false);
-		try {
-			Drawable d = new BitmapDrawable(TiUIHelper.createBitmap(file.getInputStream()));
-			d.setBounds(0, 0, d.getIntrinsicWidth(), d.getIntrinsicHeight());
-			return d;
-		} catch (IOException e) {
-			Log.e(LCAT, "Error creating drawable from path: " + pinImage.toString(), e);
-		}
-		return null;
+		if( image == null ) return null;
+		return image.getBitmapDrawableFromData();
 	}
 
     private double scaleFromGoogle(int value) {

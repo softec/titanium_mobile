@@ -640,10 +640,14 @@
 		}
 		if (annView==nil)
 		{
-			id imagePath = [ann valueForUndefinedKey:@"image"];
-			if (imagePath!=nil)
-			{
-				UIImage *image = [TiUtils image:imagePath proxy:ann];
+			id imageProp = [ann valueForUndefinedKey:@"image"];
+			if (imageProp!=nil) {
+                UIImage *image = nil;
+                if ([imageProp isKindOfClass:[TiBlob class]]) {
+                    image = ((TiBlob*)imageProp).image;
+                } else {
+                    image = [TiUtils image:imageProp proxy:ann];
+                }
 				if (image!=nil)
 				{
 					annView=[[[TiMapImageAnnotationView alloc] initWithAnnotation:ann reuseIdentifier:identifier map:self image:image] autorelease];

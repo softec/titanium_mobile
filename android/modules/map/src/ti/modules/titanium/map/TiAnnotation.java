@@ -1,24 +1,30 @@
 /*
  * Copyright 2011 SOFTEC sa. All rights reserved.
  *
- * This source code is licensed under the Creative Commons
- * Attribution-NonCommercial-NoDerivs 3.0 Luxembourg
- * License.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * To view a copy of this license, visit
- * http://creativecommons.org/licenses/by-nc-nd/3.0/lu/
- * or send a letter to Creative Commons, 171 Second Street,
- * Suite 300, San Francisco, California, 94105, USA.
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package ti.modules.titanium.map;
 
 import java.util.UUID;
 
-import android.graphics.drawable.Drawable;
-import com.google.android.maps.GeoPoint;
+import org.appcelerator.kroll.KrollConverter;
 import org.appcelerator.kroll.KrollDict;
+import org.appcelerator.titanium.TiBlob;
 import org.appcelerator.titanium.TiC;
+import org.appcelerator.titanium.TiContext;
+import org.appcelerator.titanium.io.TiBaseFile;
+import org.appcelerator.titanium.io.TiFileFactory;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.Log;
 import org.appcelerator.titanium.util.TiConvert;
@@ -38,7 +44,7 @@ public class TiAnnotation {
 	private String subtitle;
 	private Double latitude;
 	private Double longitude;
-	private String image;
+	private TiBlob image;
 	private Integer pinColor;
 	private String leftButton;
 	private String rightButton;
@@ -87,13 +93,19 @@ public class TiAnnotation {
 		this.longitude = longitude;
 	}
 
-	public String getImage() {
+	public TiBlob getImage() {
 		return image;
 	}
 
-	public void setImage(String image) {
-		this.image = image;
+	public void setImage(TiContext context, String image) {
+        String url = context.resolveUrl(image);
+		TiBaseFile file = TiFileFactory.createTitaniumFile(context, new String[]{url}, false);
+		this.image = TiBlob.blobFromFile(context, file);
 	}
+
+    public void setImage(TiBlob imageBlob) {
+        this.image = imageBlob;
+    }
 
 	public String getLeftButton() {
 		return leftButton;
@@ -183,10 +195,8 @@ public class TiAnnotation {
 	}
 
 	public static TiAnnotation fromAnnotationProxy(AnnotationProxy ap) {
-		return fromDict(ap.getProperties());
+		return fromDict(ap.getTiContext(), ap.getProperties());
 	}
-	
-	
 	
 	@Override
 	public String toString() {
@@ -221,7 +231,7 @@ public class TiAnnotation {
 		return true;
 	}
 
-	public static TiAnnotation fromDict(final KrollDict dict) {
+	public static TiAnnotation fromDict(TiContext context, final KrollDict dict) {
 		TiAnnotation a = null;
 		if (dict.containsKeyAndNotNull(TiC.PROPERTY_ID)) {
 			a = new TiAnnotation(dict.getString(TiC.PROPERTY_ID));
@@ -245,10 +255,13 @@ public class TiAnnotation {
 		}
 		
 		if (dict.containsKeyAndNotNull(TiC.PROPERTY_IMAGE) || dict.containsKeyAndNotNull(TiC.PROPERTY_PIN_IMAGE)) {
-			a.setImage(dict.getString(TiC.PROPERTY_IMAGE));
-			if (a.getImage() == null) {
-				a.setImage(dict.getString(TiC.PROPERTY_PIN_IMAGE));
-			}
+            Object o = dict.get(TiC.PROPERTY_IMAGE);
+            if( o == null ) o = dict.get(TiC.PROPERTY_PIN_IMAGE);
+            if( o instanceof TiBlob ) {
+                a.setImage((TiBlob)o);
+            } else {
+                a.setImage(context, KrollConverter.toString(o));
+            }
 		}
 		
 		if (dict.containsKeyAndNotNull(TiC.PROPERTY_PINCOLOR)) {

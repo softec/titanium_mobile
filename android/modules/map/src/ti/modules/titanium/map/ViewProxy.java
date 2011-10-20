@@ -8,15 +8,13 @@ package ti.modules.titanium.map;
 
 import java.util.ArrayList;
 
-import org.appcelerator.kroll.KrollDefaultValueProvider;
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.TiApplication;
-import org.appcelerator.titanium.TiBaseActivity;
 import org.appcelerator.titanium.TiC;
 import org.appcelerator.titanium.TiContext;
-import org.appcelerator.titanium.TiRootActivity;
 import org.appcelerator.titanium.TiContext.OnLifecycleEvent;
+import org.appcelerator.titanium.TiRootActivity;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.Log;
 import org.appcelerator.titanium.util.TiConvert;
@@ -152,21 +150,21 @@ public class ViewProxy extends TiViewProxy
 	}
 
 	@Kroll.method
-	public void removeAllAnnotations()
+	public void removeAllAnnotations(@Kroll.argument(optional=true) Boolean updateDisplay)
 	{
 		annotations.clear();
-		if(mapView != null) {
+		if(updateDisplay && mapView != null) {
 			mapView.updateAnnotations();
 		}
 	}
 
 	@Kroll.method
-	public String addAnnotation(Object arg, @Kroll.argument(optional = true) Boolean updateDisplay) {
+	public String addAnnotation(Object arg, @Kroll.argument(optional=true) Boolean updateDisplay) {
 		TiAnnotation annotation = null;
 		if (arg instanceof AnnotationProxy) {
 			annotation = TiAnnotation.fromAnnotationProxy((AnnotationProxy) arg);
 		} else if (arg instanceof KrollDict) {
-			annotation = TiAnnotation.fromDict((KrollDict) arg);
+			annotation = TiAnnotation.fromDict(getTiContext(), (KrollDict) arg);
 		} else {
 			Log.d(LCAT, "Unexpected annotation type: " + arg.getClass().getName());
 		}
@@ -194,7 +192,7 @@ public class ViewProxy extends TiViewProxy
 					annotation = TiAnnotation.fromAnnotationProxy((AnnotationProxy) args[i]);
 				} else if (args[i] instanceof KrollDict) {
 					KrollDict params = (KrollDict) args[i];
-					annotation = TiAnnotation.fromDict(params);
+					annotation = TiAnnotation.fromDict(getTiContext(), params);
 				} else {
 					Log.d(LCAT, "Unexpected parameter for addAnnotations " + args[i].getClass().getName());
 				}
